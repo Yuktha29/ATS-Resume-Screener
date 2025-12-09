@@ -1,9 +1,8 @@
 import re
 from joblib import load
 
-
-clf_model = load("resume_model.pkl")
-clf_vectorizer = load("vectorizer.pkl")
+clf_model = load("match_model.pkl")
+clf_vectorizer = load("match_vectorizer.pkl")
 
 def clean_text(t):
     if not isinstance(t, str):
@@ -12,97 +11,101 @@ def clean_text(t):
     return t.strip().lower()
 
 def extract_keywords(text):
-    """Extract basic keywords from any text."""
     text = clean_text(text)
     words = re.findall(r"[a-zA-Z]+", text)
     return set(w for w in words if len(w) > 3)
+
+def detect_resume_structure(text):
+    """Check if text looks like a real resume."""
+    text = text.lower()
+    
+    indicators = [
+        "experience", "education", "skills",
+        "projects", "contact", "summary",
+        "activities", "certifications", "work"
+    ]
+
+    count = sum(1 for word in indicators if word in text)
+
+    return count  
 
 def analyze_resume(resume_text, job_desc):
     resume_text = clean_text(resume_text)
     job_desc = clean_text(job_desc)
 
 
-    resume_vec = clf_vectorizer.transform([resume_text])
-    predicted_category = clf_model.predict(resume_vec)[0]
-    predicted_category_lower = predicted_category.lower()
+    structure_score = detect_resume_structure(resume_text)
+    if structure_score == 0:
+       
+        return {
+            "overallScore": 5,
+            "summary": "Document does not appear to be a resume.",
+            "categories": [],
+            "suggestions": [
+                "Upload a real resume instead of an essay or unrelated document."
+            ]
+        }
 
+
+    combined = resume_text + " " + job_desc
+    features = clf_vectorizer.transform([combined])
+
+    prob = clf_model.predict_proba(features)[0][1]
+    ml_score = int(prob * 100)
+
+   
+    adjusted_ml_score = int(ml_score * 0.5)  
+
+ 
     jd_keywords = extract_keywords(job_desc)
     resume_keywords = extract_keywords(resume_text)
 
-    if predicted_category_lower in job_desc:
-        category_score = 45
-    else:
-        if any(word in job_desc for word in predicted_category_lower.split()):
-            category_score = 30
-        else:
-            category_score = 10
-
     overlap = resume_keywords.intersection(jd_keywords)
+
     if len(jd_keywords) > 0:
         overlap_ratio = len(overlap) / len(jd_keywords)
     else:
         overlap_ratio = 0
 
-    overlap_score = int(min(40, overlap_ratio * 40 * 3))   
+    keyword_score = int(min(25, overlap_ratio * 25 * 2))  
+
 
     bonus = 0
-
     if re.search(r"\d+%", resume_text):
         bonus += 5
-    if 200 < len(resume_text.split()) < 1500:
+    if 200 < len(resume_text.split()) < 1200:
         bonus += 5
 
 
-    final_score = max(0, min(100, category_score + overlap_score + bonus))
+    structure_bonus = min(structure_score * 3, 15)  
 
-    summary = f"Predicted Resume Category: {predicted_category} — Match Score: {final_score}%"
+
+    final_score = min(100, adjusted_ml_score + keyword_score + bonus + structure_bonus)
+
+    summary = f"Resume-to-job match score: {final_score}%"
 
     suggestions = []
-    if category_score < 30:
-        suggestions.append("Your resume does not strongly match the job category. Consider emphasizing relevant skills.")
-    if overlap_score < 20:
-        suggestions.append("Add more keywords that appear in the job description.")
+    if structure_score < 2:
+        suggestions.append("Add core resume sections: Experience, Education, Skills.")
+    if keyword_score < 10:
+        suggestions.append("Your resume does not mention enough job-specific keywords.")
+    if ml_score < 50:
+        suggestions.append("Content does not strongly match the job description.")
     if bonus < 5:
-        suggestions.append("Include measurable achievements using percentages or numbers.")
+        suggestions.append("Add measurable achievements with numbers.")
 
-    suggestions.append("Ensure clean formatting and clear section headings.")
+    suggestions.append("Keep formatting clean and professional.")
 
     categories = [
-        {
-            "title": "Category Match",
-            "score": category_score,
-            "issues": [
-                {
-                    "type": "success" if category_score > 30 else "warning",
-                    "message": f"Category match score is {category_score}/50"
-                }
-            ]
-        },
-        {
-            "title": "Keyword Relevance",
-            "score": overlap_score,
-            "issues": [
-                {
-                    "type": "success" if overlap_score > 20 else "warning",
-                    "message": f"Keyword overlap with job description: {len(overlap)} keywords"
-                }
-            ]
-        },
-        {
-            "title": "Professional Impact",
-            "score": bonus,
-            "issues": [
-                {
-                    "type": "success" if bonus == 10 else "warning",
-                    "message": "Resume impact score based on metrics and length."
-                }
-            ]
-        },
+        {"title": "ML Match Score", "score": adjusted_ml_score, "issues": []},
+        {"title": "Keyword Relevance", "score": keyword_score, "issues": []},
+        {"title": "Resume Structure", "score": structure_bonus, "issues": []},
+        {"title": "Impact Metrics Bonus", "score": bonus, "issues": []},
     ]
 
     return {
         "overallScore": final_score,
         "summary": summary,
         "categories": categories,
-        "suggestions": suggestions,
+        "suggestions": suggestions
     }
