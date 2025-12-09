@@ -1,36 +1,37 @@
 # backend/train_model.py
 import pandas as pd
+import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-import joblib
 
-print("Loading resume dataset...")
-df = pd.read_csv('resume_dataset.csv')
+
+print("Loading resume dataset")
+data_file = pd.read_csv('resume_dataset.csv')
 
 # Keep only needed columns
-df = df[['Resume_str', 'Category']].dropna()
-print(f"Loaded {len(df)} resumes across {df['Category'].nunique()} categories.")
+data_file = data_file[['Resume_str', 'Category']].dropna()
+print(f"Loaded {len(data_file)} resumes across {data_file['Category'].nunique()} categories.")
 
-# Vectorize resume text
+# Vectored resume text
 print("Vectorizing text with TF-IDF...")
 vectorizer = TfidfVectorizer(
     max_features=3000,
     stop_words='english',
     lowercase=True,
-    ngram_range=(1, 2)  # unigrams + bigrams
+    ngram_range=(1, 2)  
 )
-X = vectorizer.fit_transform(df['Resume_str'])
-y = df['Category']
+X = vectorizer.fit_transform(data_file['Resume_str'])
+y = data_file['Category']
 
 # Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Train Logistic Regression (fast + interpretable)
+# Training with Logistic Regression 
 print("Training Logistic Regression model...")
-model = LogisticRegression(max_iter=1000, random_state=42)
+model = LogisticRegression(max_iter=1000, random_state = 42)
 model.fit(X_train, y_train)
 
 # Evaluate
@@ -42,5 +43,5 @@ print(f"Test Accuracy:  {test_acc:.2%}")
 # Save model & vectorizer for Flask backend
 joblib.dump(model, 'resume_model.pkl')
 joblib.dump(vectorizer, 'vectorizer.pkl')
-print("✅ Model saved as 'resume_model.pkl'")
-print("✅ Vectorizer saved as 'vectorizer.pkl'")
+print("Model saved as 'resume_model.pkl'")
+print("Vectorizer saved as 'vectorizer.pkl'")
