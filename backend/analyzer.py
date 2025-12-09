@@ -1,129 +1,139 @@
 import re
 import random
-from collections import Counter
-
-def clean_text(text):
-    """Normalize and clean text for analysis."""
-    if not isinstance(text, str):
-        return ""
-    # Remove extra whitespace, newlines, and non-alphanumeric (keep letters/spaces)
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[^a-zA-Z0-9\s]', ' ', text)
-    return text.strip().lower()
-
-def extract_keywords(text, ngram_range=(1, 2), min_freq=1):
-    """Extract meaningful unigrams and bigrams."""
-    words = clean_text(text).split()
-    tokens = []
-
-    # Add unigrams
-    tokens.extend([w for w in words if len(w) >= 3])
-
-    # Add bigrams
-    for i in range(len(words) - 1):
-        bigram = f"{words[i]} {words[i+1]}"
-        if len(bigram.replace(' ', '')) >= 5:  # filter short combos
-            tokens.append(bigram)
-
-    # Filter by frequency
-    counts = Counter(tokens)
-    return {token for token, count in counts.items() if count >= min_freq}
 
 def analyze_resume(resume_text, job_desc_text):
-    # --- 1. Handle empty job description gracefully ---
-    if not job_desc_text or not job_desc_text.strip():
-        # Use a generic but relevant default
-        job_desc_text = "software engineer python javascript react machine learning data analysis problem solving communication teamwork"
+    resume_lower = resume_text.lower()
+    words = resume_lower.split()
+    char_ctr = len(resume_text)
+    word_ctr = len(words)
 
-    # --- 2. Extract keywords from both ---
-    resume_keywords = extract_keywords(resume_text)
-    job_keywords = extract_keywords(job_desc_text)
-
-    if not job_keywords:
-        job_keywords = {"software", "engineer", "development"}
-
-    # --- 3. Compute match metrics ---
-    common = resume_keywords & job_keywords
-    missing = job_keywords - resume_keywords
-    extra = resume_keywords - job_keywords
-
-    match_ratio = len(common) / len(job_keywords) if job_keywords else 0
-    base_score = min(98, max(50, int(match_ratio * 100)))
-
-    # --- 4. Simulate fairness adjustment (per proposal) ---
-    # Reduce over-penalization for non-traditional formats
-    fairness_boost = 0
-    if len(resume_text.split()) < 200:  # short resume
-        fairness_boost = random.randint(2, 6)
-    elif len(resume_text.split()) > 800:  # very long resume
-        fairness_boost = random.randint(-3, 2)
-
-    overall_score = min(99, max(55, base_score + fairness_boost))
-
-    # --- 5. Build dynamic feedback ---
-    top_missing = sorted(list(missing))[:3]
-    top_common = sorted(list(common))[:3]
-
-    # Summary
-    summary = f"Your resume shows a {overall_score}% match for this role based on keyword alignment."
-
-    # Suggestions
-    suggestions = []
-    if top_missing:
-        suggestions.append(f"Consider adding relevant terms like: {', '.join(top_missing[:2])}.")
-    suggestions.extend([
-        "Quantify achievements with metrics (e.g., 'improved efficiency by 30%').",
-        "Use consistent date formatting (e.g., MM/YYYY) throughout your work history.",
-        "Add a brief professional summary at the top to highlight your core strengths."
+    #Basic validity checks for if the doc is a resume
+    is_resume = any(kw in resume_lower for kw in [
+        'experience', 'education', 'skills', 'work', 'project', 'degree', 'bachelor', 'resume', 'cv'
     ])
 
-    # Category: Content Relevance
-    content_score = overall_score
-    content_issues = [
-        {
-            "type": "success" if content_score > 75 else "warning",
-            "message": f"Resume contains {len(common)} of {len(job_keywords)} relevant keywords."
+    if not is_resume or word_ctr < 30:
+        return {
+            "overallScore": 20,
+            "summary": "This document does not appear to be a standard resume. It may be missing soem sections like work experience or education.",
+            "categories": [
+                {"title": "Content Relevance", "score": 20, "issues": [{"type": "warning", "message": "No resuem-like structure detected"}]},
+                {"title": "Formatting & Structure", "score": 25, "issues": [{"type": "warning", "message": "Document too short or lacks standard sections"}]},
+                {"title": "Professional Impact", "score": 20, "issues": [{"type": "warning", "message": "Unable to assess relevance without resume content"}]}
+            ],
+            "suggestions": [
+                "Ensure you're uploading a resume (not a cover letter, image, or unrelated document).",
+                "Include indusry standard sections: Work Experience, Education, Skills.",
+                "Use professional language and clear section starters."
+            ]
         }
-    ]
-    if top_missing:
-        content_issues.append({
-            "type": "warning",
-            "message": f"Missing key terms: {', '.join(top_missing[:2])}"
-        })
 
-    # Category: Formatting & Structure
-    formatting_score = min(92, overall_score + random.randint(-5, 5))
-    formatting_issues = [
-        {"type": "warning", "message": "Inconsistent date formatting across roles."},
-        {"type": "success", "message": "Clear section headers (e.g., Experience, Skills)."}
-    ]
+    # Section detection
+    section_keywords = {
+        "experience": r"\b(experience|work|employment)\b",
+        "education": r"\b(education|degree|university|college|bachelor|master)\b",
+        "skills": r"\b(skills|technologies|tools|languages|frameworks)\b",
+        "achievements": r"\b(increased|improved|developed|led|reduced|optimized|launched)\b"
+    }
 
-    # Category: Professional Impact
-    impact_score = min(90, overall_score + random.randint(-4, 4))
-    impact_issues = [
-        {"type": "warning", "message": "Consider adding a professional summary."},
-        {"type": "success", "message": "Work experience aligns with technical expectations."}
-    ]
+    section_present = {}
+    for key, pat in section_keywords.items():
+        section_present[key] = bool(re.search(pat, resume_lower))
+
+    has_expirience = section_present["experience"]
+    has_education = section_present["education"]
+    has_skills = section_present["skills"]
+    has_achv = section_present["achievements"]
+
+    #Job description processing 
+    if job_desc_text.strip():
+        job_words = set(re.findall(r'\b[a-z]{3,}\b', job_desc_text.lower()))
+        resume_words = set(re.findall(r'\b[a-z]{3,}\b', resume_lower))
+        overlap = resume_words & job_words
+        match_ratio = len(overlap) / max(len(job_words), 1)
+        base_score = min(95, max(50, int(match_ratio * 80 + 20)))
+    else:
+        # Score based on completeness
+        completeness = sum([has_expirience, has_education, has_skills, has_achv])
+        base_score = 50 + (completeness * 10)  # 50 to 90
+
+    overall_score = min(95, max(30, base_score + random.randint(-5, 5)))
+
+    # Dynamic issues per section tailored to resumes
+    categories = []
+    suggestions = []
+
+    # Content Relevance
+    content_issues = []
+    if not has_expirience:
+        content_issues.append({"type": "warning", "message": "Work experience section missing"})
+        suggestions.append("Add a 'Work Experience' section with your past roles.")
+    if not has_education:
+        content_issues.append({"type": "warning", "message": "Education details not found"})
+        suggestions.append("Include your degree, university, and graduation year.")
+    if not has_skills:
+        content_issues.append({"type": "warning", "message": "Technical skills not listed"})
+        suggestions.append("List relevant tools, languages, and frameworks used.")
+    if not has_achv:
+        content_issues.append({"type": "warning", "message": "Lacks quantified achievements"})
+        suggestions.append("Use action verbs and metrics (e.g., 'optimized API latency by 40%').")
+
+    if not content_issues:
+        content_issues.append({"type": "success", "message": "Resume contains all key sections"})
+        
+    temp_cat = max(40, overall_score - 5)
+    categories.append({
+        "title": "Content Completeness",
+        "score": min(90, temp_cat),
+        "issues": content_issues
+    })
+
+    # Formatting and Structure
+    formatting_issues = []
+    if word_ctr < 150:
+        formatting_issues.append({"type": "warning", "message": "Resume is too brief (<150 words)"})
+    if word_ctr > 600:
+        formatting_issues.append({"type": "warning", "message": "Resume may be too long (>600 words)"})
+    
+    #Check for dates
+    has_dates = bool(re.search(r'\b(19|20)\d{2}\b|(\d{1,2}/\d{4})', resume_text))
+    if not has_dates:
+        formatting_issues.append({"type": "warning", "message": "Missing dates in work/education history"})
+
+    if not formatting_issues:
+        formatting_issues.append({"type": "success", "message": "Good length and structure"})
+
+    categories.append({
+        "title": "Formatting & Structure",
+        "score": min(85, max(45, overall_score - random.randint(0, 8))),
+        "issues": formatting_issues
+    })
+
+    #Professional Impact (use strong action verbs)
+    impact_issues = []
+    if has_achv:
+        impact_issues.append({"type": "success", "message": "Strong action verbs and results"})
+    else:
+        impact_issues.append({"type": "warning", "message": "Focus on outcomes, not just duties"})
+        
+    temp_score = max(50, overall_score)
+    categories.append({
+        "title": "Professional Impact",
+        "score": min(90, temp_score),
+        "issues": impact_issues
+    })
+
+    # Final suggestions output
+    if not suggestions:
+        suggestions = [
+            "Quantify achievements with metrics (e.g., 'reduced costs by 25%').",
+            "Use consistent formatting for dates, job titles, and company names.",
+            "Tailor your resume to the job by including relevant keywords."
+        ]
 
     return {
         "overallScore": overall_score,
-        "summary": summary,
-        "categories": [
-            {
-                "title": "Content Relevance",
-                "score": content_score,
-                "issues": content_issues
-            },
-            {
-                "title": "Formatting & Structure",
-                "score": formatting_score,
-                "issues": formatting_issues
-            },
-            {
-                "title": "Professional Impact",
-                "score": impact_score,
-                "issues": impact_issues
-            }
-        ],
+        "summary": f"This resume scored {overall_score}/100 based on completenesss, relevance, and structure.",
+        "categories": categories,
         "suggestions": suggestions
     }
