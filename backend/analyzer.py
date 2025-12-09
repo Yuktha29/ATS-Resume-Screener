@@ -1,71 +1,100 @@
-import re
+import joblib
 import random
+import re
+
+# Load models
+try:
+    category_model = joblib.load('category_predictor.pkl')
+    category_vectorizer = joblib.load('category_vectorizer.pkl')
+    USE_CATEGORY_MODEL = True
+except FileNotFoundError:
+    print("Category model not found")
+    USE_CATEGORY_MODEL = False
 
 def analyze_resume(resume_text, job_desc_text):
-    resume_lower = resume_text.lower()
+    # Normalize input
+    resume_lower = resume_text.lower() if resume_text else ""
     words = resume_lower.split()
-    char_ctr = len(resume_text)
-    word_ctr = len(words)
+    word_count = len(words)
 
-    #Basic validity checks for if the doc is a resume
-    is_resume = any(kw in resume_lower for kw in [
-        'experience', 'education', 'skills', 'work', 'project', 'degree', 'bachelor', 'resume', 'cv'
-    ])
+    # --- 1. Basic validity: is this even a resume? ---
+    resume_keywords = [
+        'experience', 'education', 'skills', 'work', 'project',
+        'degree', 'bachelor', 'master', 'resume', 'cv', 'employment'
+    ]
+    is_resume = any(kw in resume_lower for kw in resume_keywords)
 
-    if not is_resume or word_ctr < 30:
+    if not is_resume or word_count < 30:
         return {
             "overallScore": 20,
-            "summary": "This document does not appear to be a standard resume. It may be missing soem sections like work experience or education.",
+            "summary": "This document does not appear to be a standard resume. It may be missing key sections like work experience or education.",
             "categories": [
-                {"title": "Content Relevance", "score": 20, "issues": [{"type": "warning", "message": "No resuem-like structure detected"}]},
+                {"title": "Content Relevance", "score": 20, "issues": [{"type": "warning", "message": "No resume-like structure detected"}]},
                 {"title": "Formatting & Structure", "score": 25, "issues": [{"type": "warning", "message": "Document too short or lacks standard sections"}]},
                 {"title": "Professional Impact", "score": 20, "issues": [{"type": "warning", "message": "Unable to assess relevance without resume content"}]}
             ],
             "suggestions": [
                 "Ensure you're uploading a resume (not a cover letter, image, or unrelated document).",
-                "Include indusry standard sections: Work Experience, Education, Skills.",
-                "Use professional language and clear section starters."
+                "Include industry standard sections: Work Experience, Education, Skills.",
+                "Use professional language and clear section headers."
             ]
         }
 
-    # Section detection
-    section_keywords = {
-        "experience": r"\b(experience|work|employment)\b",
-        "education": r"\b(education|degree|university|college|bachelor|master)\b",
-        "skills": r"\b(skills|technologies|tools|languages|frameworks)\b",
-        "achievements": r"\b(increased|improved|developed|led|reduced|optimized|launched)\b"
-    }
+    # --- 2. Predict resume category ---
+    predicted_category = "Other"
+    category_score = 0
+    if USE_CATEGORY_MODEL:
+        try:
+            X = category_vectorizer.transform([resume_text])
+            proba = category_model.predict_proba(X)[0]
+            predicted_category = category_model.classes_[proba.argmax()]
+            category_score = int(proba.max() * 50)  # 0–50 for category match
+        except Exception as e:
+            print("❌ Category prediction failed:", e)
 
-    section_present = {}
-    for key, pat in section_keywords.items():
-        section_present[key] = bool(re.search(pat, resume_lower))
-
-    has_expirience = section_present["experience"]
-    has_education = section_present["education"]
-    has_skills = section_present["skills"]
-    has_achv = section_present["achievements"]
-
-    #Job description processing 
-    if job_desc_text.strip():
+    # --- 3. Job description–aware scoring ---
+    if job_desc_text and job_desc_text.strip():
+        # Extract keywords from both
         job_words = set(re.findall(r'\b[a-z]{3,}\b', job_desc_text.lower()))
         resume_words = set(re.findall(r'\b[a-z]{3,}\b', resume_lower))
         overlap = resume_words & job_words
-        match_ratio = len(overlap) / max(len(job_words), 1)
-        base_score = min(95, max(50, int(match_ratio * 80 + 20)))
+        match_ratio = len(overlap) / max(len(job_words), 1) if job_words else 0
+        keyword_score = int(match_ratio * 30)  # 0–30 for keyword match
+        overall_score = min(95, max(30, category_score + keyword_score))
+        summary = f"This resume scored {overall_score}/100 based on alignment with the provided job description."
     else:
-        # Score based on completeness
-        completeness = sum([has_expirience, has_education, has_skills, has_achv])
-        base_score = 50 + (completeness * 10)  # 50 to 90
+        # Fallback: score by completeness + category confidence
+        completeness = sum([
+            bool(re.search(r'\b(experience|work|employment)\b', resume_lower)),
+            bool(re.search(r'\b(education|degree|university|college|bachelor|master)\b', resume_lower)),
+            bool(re.search(r'\b(skills|technologies|tools|languages|frameworks)\b', resume_lower)),
+            bool(re.search(r'\b(increased|improved|developed|led|reduced|optimized|launched)\b', resume_lower))
+        ])
+        completeness_score = 10 * completeness  # 0–40
+        overall_score = min(95, max(30, category_score + completeness_score))
+        summary = f"This resume scored {overall_score}/100 based on its predicted category ({predicted_category}) and completeness."
 
-    overall_score = min(95, max(30, base_score + random.randint(-5, 5)))
+    # --- 4. Fairness adjustment ---
+    fairness_boost = 0
+    if word_count < 200:
+        fairness_boost = random.randint(2, 5)
+    elif "linkedin" in resume_lower or "github" in resume_lower:
+        fairness_boost = random.randint(1, 3)
 
-    # Dynamic issues per section tailored to resumes
+    overall_score = min(95, max(30, overall_score + fairness_boost + random.randint(-2, 2)))
+
+    # --- 5. Build dynamic feedback ---
     categories = []
     suggestions = []
 
-    # Content Relevance
+    # Content Completeness
     content_issues = []
-    if not has_expirience:
+    has_experience = bool(re.search(r'\b(experience|work|employment)\b', resume_lower))
+    has_education = bool(re.search(r'\b(education|degree|university|college|bachelor|master)\b', resume_lower))
+    has_skills = bool(re.search(r'\b(skills|technologies|tools|languages|frameworks)\b', resume_lower))
+    has_achievements = bool(re.search(r'\b(increased|improved|developed|led|reduced|optimized|launched)\b', resume_lower))
+
+    if not has_experience:
         content_issues.append({"type": "warning", "message": "Work experience section missing"})
         suggestions.append("Add a 'Work Experience' section with your past roles.")
     if not has_education:
@@ -74,29 +103,27 @@ def analyze_resume(resume_text, job_desc_text):
     if not has_skills:
         content_issues.append({"type": "warning", "message": "Technical skills not listed"})
         suggestions.append("List relevant tools, languages, and frameworks used.")
-    if not has_achv:
+    if not has_achievements:
         content_issues.append({"type": "warning", "message": "Lacks quantified achievements"})
         suggestions.append("Use action verbs and metrics (e.g., 'optimized API latency by 40%').")
 
     if not content_issues:
         content_issues.append({"type": "success", "message": "Resume contains all key sections"})
-        
-    temp_cat = max(40, overall_score - 5)
+
     categories.append({
         "title": "Content Completeness",
-        "score": min(90, temp_cat),
+        "score": min(90, max(40, overall_score - 5)),
         "issues": content_issues
     })
 
-    # Formatting and Structure
+    # Formatting & Structure
     formatting_issues = []
-    if word_ctr < 150:
+    if word_count < 150:
         formatting_issues.append({"type": "warning", "message": "Resume is too brief (<150 words)"})
-    if word_ctr > 600:
+    if word_count > 600:
         formatting_issues.append({"type": "warning", "message": "Resume may be too long (>600 words)"})
-    
-    #Check for dates
-    has_dates = bool(re.search(r'\b(19|20)\d{2}\b|(\d{1,2}/\d{4})', resume_text))
+
+    has_dates = bool(re.search(r'\b(19|20)\d{2}\b|(\d{1,2}[/-]\d{4})|([A-Za-z]+\s+\d{4})', resume_text))
     if not has_dates:
         formatting_issues.append({"type": "warning", "message": "Missing dates in work/education history"})
 
@@ -109,31 +136,31 @@ def analyze_resume(resume_text, job_desc_text):
         "issues": formatting_issues
     })
 
-    #Professional Impact (use strong action verbs)
+    # Professional Impact
     impact_issues = []
-    if has_achv:
+    if has_achievements:
         impact_issues.append({"type": "success", "message": "Strong action verbs and results"})
     else:
         impact_issues.append({"type": "warning", "message": "Focus on outcomes, not just duties"})
-        
-    temp_score = max(50, overall_score)
+
     categories.append({
         "title": "Professional Impact",
-        "score": min(90, temp_score),
+        "score": min(90, max(50, overall_score)),
         "issues": impact_issues
     })
 
-    # Final suggestions output
+    # Final suggestions
     if not suggestions:
         suggestions = [
-            "Quantify achievements with metrics (e.g., 'reduced costs by 25%').",
+            "Quantify achievements with metrics (e.g., 'improved runtimes by 25%').",
             "Use consistent formatting for dates, job titles, and company names.",
             "Tailor your resume to the job by including relevant keywords."
         ]
 
     return {
         "overallScore": overall_score,
-        "summary": f"This resume scored {overall_score}/100 based on completenesss, relevance, and structure.",
+        "summary": summary,
         "categories": categories,
-        "suggestions": suggestions
+        "suggestions": suggestions,
+        "predictedCategory": predicted_category  # ← Add this for frontend display
     }
