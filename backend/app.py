@@ -1,34 +1,30 @@
 from flask import Flask, request, jsonify
-import tempfile
-import os
 from flask_cors import CORS
+import os
+import tempfile
 from parser import extract_text_from_pdf
 from analyzer import analyze_resume
 
 app = Flask(__name__)
-CORS(app)  # Allow the frontent to connect backend
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max
+CORS(app)
 
-@app.route('/analyze', methods=['POST'])
+@app.route("/analyze", methods=["POST"])
 def analyze():
-    if 'resume' not in request.files:
-        return jsonify({"error": "No resume file uploaded"}), 400
+    if "resume" not in request.files:
+        return jsonify({"error": "Resume file missing"}), 400
 
-    file = request.files['resume']
-    if file.filename.lower().endswith('.pdf') == False:
-        return jsonify({"error": "Only PDF files are allowed"}), 400
+    resume_file = request.files["resume"]
+    jd_text = request.form.get("jobDesc", "")
 
-    # Save to a temp file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp:
-        file.save(temp.name)
-        cur_text = extract_text_from_pdf(temp.name)
-        os.unlink(temp.name)
 
-    job_descr = request.form.get('jobDesc', '')
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp:
+        resume_file.save(temp.name)
+        extracted_text = extract_text_from_pdf(temp.name)
 
-    # Generate proper feedback
-    feedback = analyze_resume(cur_text, job_descr)
-    return jsonify(feedback)
+    result = analyze_resume(extracted_text, jd_text)
+    os.remove(temp.name)
+
+    return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host="localhost", port=5001, debug=True)

@@ -1,38 +1,152 @@
 .App {
   text-align: center;
-}
-
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+  padding: 40px;
+  background: #f5f6fa;
   min-height: 100vh;
+  font-family: system-ui, sans-serif;
+}
+
+.title {
+  font-size: 32px;
+  margin-bottom: 25px;
+  color: #222;
+}
+
+
+.container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  gap: 30px;
+  max-width: 1100px;
+  margin: auto;
+}
+
+
+.card {
+  width: 45%;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+h2 {
+  margin-top: 0;
+  color: #333;
+}
+
+
+.upload-box {
+  display: block;
+  border: 2px dashed #bbb;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 10px;
+  color: #555;
+}
+
+.upload-box input {
+  display: none;
+}
+
+.file-info {
+  background: #eef0f4;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+
+.jd-box {
+  margin-top: 12px;
+  width: 100%;
+  height: 110px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  resize: none;
+  font-size: 14px;
+}
+
+
+.loading {
+  margin-top: 10px;
+  color: #3b5bdb;
+}
+
+.success {
+  margin-top: 10px;
+  color: green;
+}
+
+.reset {
+  margin-top: 14px;
+  padding: 8px 12px;
+  border: none;
+  background: #eee;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+
+.placeholder {
+  color: #777;
+}
+
+.score-box {
+  margin-bottom: 20px;
+}
+
+.progress {
+  background: #ddd;
+  height: 6px;
+  border-radius: 4px;
+  margin-top: 6px;
+}
+
+.progress-fill {
+  background: #3b5bdb;
+  height: 6px;
+  border-radius: 4px;
+}
+
+
+.category {
+  border: 1px solid #eee;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.issue {
+  font-size: 14px;
+  color: #444;
+}
+
+ul {
+  padding-left: 20px;
+}
+.analyze-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: #3b5bdb;
   color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.analyze-btn:disabled {
+  background: #9aa6d1;
+  cursor: not-allowed;
 }
