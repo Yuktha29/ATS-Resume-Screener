@@ -1,37 +1,42 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Bot, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 
+
 const App = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  const uploadToBackend = (file) => {
-    const formData = new FormData();
-    formData.append('resume', file);
-    formData.append('jobDesc', jobDescription); // Can be empty
-
-    fetch('http://localhost:5001/analyze', {
-      method: 'POST',
-      body: formData,
+  const handleAnalyze = () => {
+  if (!uploadedFile) {
+    alert("Please upload a resume first.");
+    return;
+  }
+  setIsProcessing(true);
+  const formData = new FormData();
+  formData.append('resume', uploadedFile);
+  formData.append('jobDesc', jobDescription || '');
+  
+  fetch('http://localhost:5001/analyze', {
+    method: 'POST',
+    body: formData,
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error: ' + data.error);
+      } else {
+        setFeedback(data);
+      }
+      setIsProcessing(false);
     })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          alert('Error: ' + data.error);
-          setIsProcessing(false);
-        } else {
-          setFeedback(data);
-          setIsProcessing(false);
-        }
-      })
-      .catch((err) => {
-        console.error(err);
-        alert('Failed to analyze resume. Is the backend running on port 5001?');
-        setIsProcessing(false);
-      });
-  };
+    .catch(err => {
+      console.error(err);
+      alert('Failed to analyze resume. Is backend running on port 5001?');
+      setIsProcessing(false);
+    });
+};
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -75,113 +80,102 @@ const App = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Panel - Upload & Job Description */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center space-x-2 mb-4">
-                <Upload className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Upload Resume</h2>
-              </div>
+         {/* Left Panel - Input Section */}
+<div className="lg:col-span-1">
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="flex items-center space-x-2 mb-4">
+      <Upload className="w-5 h-5 text-indigo-600" />
+      <h2 className="text-lg font-semibold text-gray-900">Resume & Job Description</h2>
+    </div>
 
-              {!uploadedFile ? (
-                <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-400 transition-colors duration-200"
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                >
-                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm font-medium text-gray-900 mb-1">Drag & drop your PDF</p>
-                  <p className="text-xs text-gray-500 mb-4">or</p>
-                  <label className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 cursor-pointer transition-colors duration-200">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Browse Files
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                  <p className="text-xs text-gray-400 mt-4">PDF files only • Max 10MB</p>
+    {/* Job Description - Always Visible */}
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Job Description (optional)
+      </label>
+      <textarea
+        value={jobDescription}
+        onChange={(e) => setJobDescription(e.target.value)}
+        placeholder="Paste job description here..."
+        className="w-full text-sm border border-gray-300 rounded p-2 h-24 resize-none"
+      />
+    </div>
+
+    {/* Resume Upload */}
+    {!uploadedFile ? (
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+        <FileText className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+        <p className="text-sm text-gray-700">Upload your resume (PDF only)</p>
+        <label className="mt-2 inline-block px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg cursor-pointer hover:bg-indigo-700">
+          Choose File
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => e.target.files[0] && setUploadedFile(e.target.files[0])}
+            className="hidden"
+          />
+        </label>
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
+          <FileText className="w-4 h-4 text-indigo-600" />
+          <span className="text-sm truncate">{uploadedFile.name}</span>
+        </div>
+      </div>
+    )}
+
+    {/* Analyze Button */}
+    <button
+      onClick={handleAnalyze}
+      disabled={!uploadedFile || isProcessing}
+      className={`w-full mt-4 py-2 text-sm font-medium rounded-lg ${
+        !uploadedFile || isProcessing
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+      }`}
+    >
+      {isProcessing ? 'Analyzing...' : 'Analyze Resume'}
+    </button>
+
+    {/* Reset Button */}
+    {feedback && (
+      <button
+        onClick={() => {
+          setUploadedFile(null);
+          setJobDescription('');
+          setFeedback(null);
+        }}
+        className="w-full mt-2 text-sm text-gray-600 hover:text-gray-800"
+      >
+        Upload Different Resume
+      </button>
+    )}
+  </div>
+</div>
+
+         {/* Center Panel - PDF Preview */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Resume Preview</h2>
+            </div>
+            <div className="h-96 bg-gray-100 flex items-center justify-center">
+              {uploadedFile ? (
+                <div className="text-center">
+                  <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 text-sm">Uploaded: {uploadedFile.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">Preview not rendered (text only)</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <FileText className="w-5 h-5 text-indigo-600 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {uploadedFile.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Job Description Input */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Job Description (optional)
-                    </label>
-                    <textarea
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Paste a job description to get tailored feedback..."
-                      className="w-full text-xs border border-gray-300 rounded p-2 h-20 resize-none"
-                    />
-                  </div>
-
-                  {isProcessing && (
-                    <div className="flex items-center space-x-2 text-indigo-600">
-                      <Loader className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Analyzing your resume...</span>
-                    </div>
-                  )}
-
-                  {!isProcessing && feedback && (
-                    <div className="flex items-center space-x-2 text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm">Analysis complete!</span>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setUploadedFile(null);
-                      setFeedback(null);
-                      setJobDescription('');
-                    }}
-                    className="w-full text-sm text-gray-600 hover:text-gray-800 font-medium py-2"
-                  >
-                    Upload Different File
-                  </button>
+                <div className="text-center">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Upload a PDF to preview</p>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Center Panel - Static PDF Preview */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Resume Preview</h2>
-              </div>
-              <div className="h-96 bg-gray-100 flex items-center justify-center">
-                {uploadedFile ? (
-                  <div className="text-center">
-                    <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 text-sm">Uploaded: {uploadedFile.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">Preview not rendered (text only)</p>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">Upload a PDF to preview</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        </div>
 
           {/* Right Panel - AI Feedback */}
           <div className="lg:col-span-1">
@@ -213,6 +207,11 @@ const App = () => {
                       ></div>
                     </div>
                   </div>
+
+                <div className="mt-4">
+                  <h3 className="font-medium text-gray-900">Predicted Resume Category</h3>
+                  <p className="text-sm text-gray-600">{feedback.predictedCategory}</p>
+                </div>
 
                   {/* Summary */}
                   <div>
