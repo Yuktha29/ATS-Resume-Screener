@@ -10,7 +10,7 @@ The system consists of:
 nyone can clone and run this project locally by following the instructions below.
 
 1. Clone the Repository
-- git clone <https://github.com/Abu-Jarjis/368_Group-11_RESUME_SCREENEr.git>
+- git clone <https://github.com/Yuktha29/ATS-Resume-Screener.git>
 
 
 2. Setup & Run the Backend 
@@ -78,3 +78,20 @@ npm install
 
 # Start the React app
 npm start
+
+## Project Attribution & Contributions
+
+This is a public showcase copy of a collaborative academic group project.
+
+The project was developed by a team as part of a course assignment.  
+This repository is shared publicly to demonstrate my participation, understanding of the system, and ability to run, explain, and work with a full-stack ML application.
+
+### My Contributions
+- Participated in project setup, execution, and testing
+- Worked with the existing ML pipeline and backend to understand data flow and scoring logic
+- Assisted with running experiments, validating outputs, and debugging issues
+- Contributed to documentation, cleanup, and preparation of a public-ready version of the project
+- Gained hands-on experience working with Flask, React, and ML-based resume analysis systems
+
+### Note
+Core model design and dataset preparation were collaborative efforts by the team.
