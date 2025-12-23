@@ -13,3 +13,9 @@ yarn-error.log*
 # IDE
 .vscode/
 .DS_Store
+
+*.csv
+*.zip
+backend/archive/
+data/
+datasets/
